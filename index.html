@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>SDC Microservice Versions</title>
+    <style type="text/css">
+      body {
+        background-color: #fff;
+        color: #000;
+        font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+        margin: 0 2em 2em;
+      }
+      h1 {
+        font-size: 240%;
+        text-transform: uppercase;
+      }
+      h2 {
+        font-size: 140%
+      }
+      table {
+        background-color: #000;
+        border: 2px solid #000;
+        border-collapse: separate;
+        border-spacing: 1px;
+        border-radius: 6px;
+        font-size: 80%;
+      }
+      thead {
+        color: #fff;
+      }
+      tbody tr:nth-child(even) {
+        background-color: #ccc;
+      }
+      tbody tr:nth-child(odd) {
+        background-color: #fff;
+      }
+      th {
+        color: #fff;
+        font-weight: bold;
+        text-align: left;
+      }
+      th, td {
+        padding: 5px;
+        vertical-align: top;
+      }
+      td[data-content="N/A"] {
+        color: #999;
+      }
+      td {
+        min-width: 100px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>SDC Microservice Versions</h1>
+    <p>This dashboard shows which versions of the Survey Data Collection (SDC) platform microservices are deployed to which environment.</p>
+    <h2>{{.Timestamp}}</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Microservice</th>
+        {{$environments := .Environments}}
+        {{$services := .Services}}
+        {{$versions := .Versions}}
+        {{range $label, $environment := $environments}}
+          <th>{{$label}}</th>
+        {{end}}
+        </tr>
+      <tbody>
+      {{range $service := $services}}
+        <tr>
+          <td>{{$service}}</td>
+        {{range $label, $environment := $environments}}
+          {{$version := $.Version $environment $service}}
+          <td data-content="{{$version}}">{{$version}}</td>
+        {{end}}
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </body>
+</html>
