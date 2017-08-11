@@ -5,10 +5,13 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/cloudfoundry-community/go-cfenv"
 )
 
 const baseURL = "https://raw.githubusercontent.com/ONSdigital/sdc-service-versions"
@@ -55,9 +58,23 @@ func (t templateData) Version(environment, service string) string {
 }
 
 func main() {
+	port := ":8080"
+	appEnv, err := cfenv.Current()
+
+	if err == nil {
+		log.Println("Found Cloud Foundry environment")
+		ps := appEnv.Port
+		port = ":" + strconv.FormatInt(int64(ps), 10)
+	} else {
+		log.Println("No Cloud Foundry environment")
+		if v := os.Getenv("PORT"); len(v) > 0 {
+			port = v
+		}
+	}
+
 	buildTemplateData()
 	http.HandleFunc("/", indexHandler)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(port, nil))
 }
 
 func buildTemplateData() templateData {

@@ -19,6 +19,15 @@ make
 
 The compiled executable is placed within the `build` directory tree.
 
+## Running
+First compile the code using `make` then execute the binary in the background using `./versions-dashboard &` from within the `bin` directory within the `build` directory tree.
+
+The following environment variable may be overridden:
+
+| Environment Variable | Purpose            | Default Value  |
+| :------------------- | :----------------- | :------------- |
+| PORT                 | HTTP listener port | :8080          |
+
 ## Cleaning
 To clobber the `build` directory tree that's created when running `make`, run:
 
