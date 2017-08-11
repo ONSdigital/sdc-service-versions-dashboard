@@ -1,6 +1,7 @@
 applications:
 - name: versions-dashboard
   instances: 1
+  host: versions-dashboard
   memory: 64M
   buildpack: go_buildpack
   env:
