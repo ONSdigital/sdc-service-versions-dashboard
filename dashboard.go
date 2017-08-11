@@ -73,7 +73,6 @@ func main() {
 		}
 	}
 
-	buildTemplateData()
 	http.HandleFunc("/", indexHandler)
 	log.Fatal(http.ListenAndServe(port, nil))
 }
