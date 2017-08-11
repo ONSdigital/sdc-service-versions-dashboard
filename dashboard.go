@@ -53,6 +53,7 @@ var services = []string{
 	"securemessagesvc",
 	"surveysvc"}
 
+// See https://stackoverflow.com/a/45612142
 func (t templateData) Version(environment, service string) string {
 	return t.Versions[versionKey{environment, service}]
 }
