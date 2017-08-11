@@ -7,5 +7,24 @@ This repository contains a dashboard application implemented using [Go](https://
 * Install the [Godep](https://github.com/tools/godep) package manager using `go get github.com/tools/godep`
 * Run `godep get` to download and install the other dependencies managed by Godep
 
+## Building
+Install Go and ensure your `GOPATH` environment variable is set (usually it's `~/go`).
+
+### Make
+A Makefile is provided for compiling the code:
+
+```
+make
+```
+
+The compiled executable is placed within the `build` directory tree.
+
+## Cleaning
+To clobber the `build` directory tree that's created when running `make`, run:
+
+```
+make clean
+```
+
 ## Copyright
 Copyright (C) 2017 Crown Copyright (Office for National Statistics)
