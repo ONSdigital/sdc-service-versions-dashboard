@@ -12,6 +12,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/cloudfoundry-community/go-cfenv"
+	"golang.org/x/sync/syncmap"
 )
 
 const baseURL = "https://raw.githubusercontent.com/ONSdigital/sdc-service-versions"
@@ -26,7 +27,7 @@ type templateData struct {
 	Timestamp    string
 	Environments map[string]string
 	Services     []string
-	Versions     map[versionKey]string
+	Versions     *syncmap.Map
 }
 
 var environments = map[string]string{
@@ -54,8 +55,9 @@ var services = []string{
 	"surveysvc"}
 
 // See https://stackoverflow.com/a/45612142
-func (t templateData) Version(environment, service string) string {
-	return t.Versions[versionKey{environment, service}]
+func (t templateData) Version(environment, service string) interface{} {
+	version, _ := t.Versions.Load(versionKey{environment, service})
+	return version
 }
 
 func main() {
@@ -80,17 +82,20 @@ func main() {
 
 func buildTemplateData() templateData {
 	timestamp := time.Now().Format(timeFormat)
-	versions := make(map[versionKey]string)
+	// versions := make(map[versionKey]string)
+	versions := syncmap.Map{}
+	channel := make(chan string, 99)
 
 	for _, environment := range environments {
 		for _, service := range services {
+			go versionForEnvironment(environment, service, channel)
 			versionKey := versionKey{environment, service}
-			versions[versionKey] = versionForEnvironment(environment, service)
+			versions.Store(versionKey, <-channel)
 			fmt.Print(".")
 		}
 	}
 
-	return templateData{timestamp, environments, services, versions}
+	return templateData{timestamp, environments, services, &versions}
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -98,11 +103,12 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.Execute(w, buildTemplateData())
 }
 
-func versionForEnvironment(environment, service string) string {
+func versionForEnvironment(environment, service string, channel chan<- string) {
 	version := "N/A"
 	doc, err := goquery.NewDocument(fmt.Sprintf("%s/%s/services/%s.version", baseURL, environment, service))
 	if err != nil {
-		log.Fatal(err)
+		channel <- fmt.Sprint(err)
+		return
 	}
 
 	doc.Find("body").Each(func(i int, s *goquery.Selection) {
@@ -111,5 +117,5 @@ func versionForEnvironment(environment, service string) string {
 		}
 	})
 
-	return version
+	channel <- version
 }
