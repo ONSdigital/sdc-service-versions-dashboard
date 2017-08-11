@@ -56,7 +56,11 @@ var services = []string{
 
 // See https://stackoverflow.com/a/45612142
 func (t templateData) Version(environment, service string) interface{} {
-	version, _ := t.Versions.Load(versionKey{environment, service})
+	version, ok := t.Versions.Load(versionKey{environment, service})
+	if !ok {
+		fmt.Printf("No value found for %v\n", versionKey{environment, service})
+	}
+	fmt.Printf("%v = %s\n", versionKey{environment, service}, version)
 	return version
 }
 
@@ -75,22 +79,17 @@ func main() {
 		}
 	}
 
-	buildTemplateData()
 	http.HandleFunc("/", indexHandler)
 	log.Fatal(http.ListenAndServe(port, nil))
 }
 
 func buildTemplateData() templateData {
 	timestamp := time.Now().Format(timeFormat)
-	// versions := make(map[versionKey]string)
 	versions := syncmap.Map{}
-	channel := make(chan string, 99)
 
 	for _, environment := range environments {
 		for _, service := range services {
-			go versionForEnvironment(environment, service, channel)
-			versionKey := versionKey{environment, service}
-			versions.Store(versionKey, <-channel)
+			go versionForEnvironment(environment, service, &versions)
 			fmt.Print(".")
 		}
 	}
@@ -103,12 +102,11 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.Execute(w, buildTemplateData())
 }
 
-func versionForEnvironment(environment, service string, channel chan<- string) {
+func versionForEnvironment(environment, service string, versions *syncmap.Map) {
 	version := "N/A"
 	doc, err := goquery.NewDocument(fmt.Sprintf("%s/%s/services/%s.version", baseURL, environment, service))
 	if err != nil {
-		channel <- fmt.Sprint(err)
-		return
+		log.Fatal(err)
 	}
 
 	doc.Find("body").Each(func(i int, s *goquery.Selection) {
@@ -117,5 +115,5 @@ func versionForEnvironment(environment, service string, channel chan<- string) {
 		}
 	})
 
-	channel <- version
+	versions.Store(versionKey{environment, service}, version)
 }
