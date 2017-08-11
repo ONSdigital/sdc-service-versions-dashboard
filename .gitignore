@@ -6,7 +6,7 @@
 *.dll
 *.so
 *.dylib
-surveysvc
+versions-dashboard
 
 # Build directory
 build/
