@@ -8,11 +8,11 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/cloudfoundry-community/go-cfenv"
-	"golang.org/x/sync/syncmap"
 )
 
 const baseURL = "https://raw.githubusercontent.com/ONSdigital/sdc-service-versions"
@@ -27,8 +27,16 @@ type templateData struct {
 	Timestamp    string
 	Environments map[string]string
 	Services     []string
-	Versions     *syncmap.Map
+	Versions     struct {
+		sync.RWMutex
+		m map[versionKey]string
+	}
 }
+
+var versions = struct {
+	sync.RWMutex
+	m map[versionKey]string
+}{m: make(map[versionKey]string)}
 
 var environments = map[string]string{
 	"CAT":            "cat",
@@ -55,13 +63,10 @@ var services = []string{
 	"surveysvc"}
 
 // See https://stackoverflow.com/a/45612142
-func (t templateData) Version(environment, service string) interface{} {
-	version, ok := t.Versions.Load(versionKey{environment, service})
-	if !ok {
-		fmt.Printf("No value found for %v\n", versionKey{environment, service})
-	}
-	fmt.Printf("%v = %s\n", versionKey{environment, service}, version)
-	return version
+func (t templateData) Version(environment, service string) string {
+	t.Versions.RLock()
+	defer t.Versions.RUnlock()
+	return t.Versions.m[versionKey{environment, service}]
 }
 
 func main() {
@@ -79,22 +84,22 @@ func main() {
 		}
 	}
 
+	buildTemplateData()
 	http.HandleFunc("/", indexHandler)
 	log.Fatal(http.ListenAndServe(port, nil))
 }
 
 func buildTemplateData() templateData {
 	timestamp := time.Now().Format(timeFormat)
-	versions := syncmap.Map{}
 
 	for _, environment := range environments {
 		for _, service := range services {
-			go versionForEnvironment(environment, service, &versions)
+			go versionForEnvironment(environment, service)
 			fmt.Print(".")
 		}
 	}
 
-	return templateData{timestamp, environments, services, &versions}
+	return templateData{timestamp, environments, services, versions}
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -102,7 +107,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.Execute(w, buildTemplateData())
 }
 
-func versionForEnvironment(environment, service string, versions *syncmap.Map) {
+func versionForEnvironment(environment, service string) {
 	version := "N/A"
 	doc, err := goquery.NewDocument(fmt.Sprintf("%s/%s/services/%s.version", baseURL, environment, service))
 	if err != nil {
@@ -115,5 +120,7 @@ func versionForEnvironment(environment, service string, versions *syncmap.Map) {
 		}
 	})
 
-	versions.Store(versionKey{environment, service}, version)
+	versions.Lock()
+	versions.m[versionKey{environment, service}] = version
+	versions.Unlock()
 }
