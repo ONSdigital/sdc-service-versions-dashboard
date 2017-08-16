@@ -46,6 +46,7 @@ var services = []string{
 	"casesvc",
 	"collectionexercisesvc",
 	"collectioninstrumentsvc",
+	"iacsvc",
 	"notifygatewaysvc",
 	"partysvc",
 	"samplesvc",
