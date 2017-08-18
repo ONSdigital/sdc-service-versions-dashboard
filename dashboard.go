@@ -106,6 +106,17 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.Execute(w, buildTemplateData())
 }
 
+func getBodyContent(doc *goquery.Document) string {
+	var bodyContent string
+	doc.Find("body").Each(func(i int, s *goquery.Selection) {
+		if s.Text() != "" && !strings.Contains(s.Text(), "404: Not Found") {
+			bodyContent = s.Text()
+		}
+	})
+
+	return bodyContent
+}
+
 func commitForEnvironment(environment, service string) string {
 	commit := ""
 	doc, err := goquery.NewDocument(fmt.Sprintf("%s/%s/services/%s.version", baseURL, environment, service))
@@ -113,14 +124,7 @@ func commitForEnvironment(environment, service string) string {
 		log.Fatal(err)
 	}
 
-	doc.Find("body").Each(func(i int, s *goquery.Selection) {
-		if s.Text() != "" && !strings.Contains(s.Text(), "404: Not Found") {
-			commit = s.Text()
-		}
-	})
-
-	versionAndCommit := strings.Split(commit, delimiter)
-
+	versionAndCommit := strings.Split(getBodyContent(doc), delimiter)
 	if len(versionAndCommit) > 1 {
 		commit = versionAndCommit[1]
 	}
@@ -135,17 +139,10 @@ func versionForEnvironment(environment, service string) string {
 		log.Fatal(err)
 	}
 
-	doc.Find("body").Each(func(i int, s *goquery.Selection) {
-		if s.Text() != "" && !strings.Contains(s.Text(), "404: Not Found") {
-			version = s.Text()
-		}
-
-		versionAndCommit := strings.Split(version, delimiter)
-
-		if len(versionAndCommit) > 1 {
-			version = versionAndCommit[0]
-		}
-	})
+	versionAndCommit := strings.Split(getBodyContent(doc), delimiter)
+	if len(versionAndCommit) > 1 {
+		version = versionAndCommit[0]
+	}
 
 	return version
 }
