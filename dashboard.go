@@ -15,6 +15,7 @@ import (
 )
 
 const baseURL = "https://raw.githubusercontent.com/ONSdigital/sdc-service-versions"
+const delimiter = ","
 const timeFormat = "Monday, 2 January 2006 15:04 MST"
 
 type versionKey struct {
@@ -26,6 +27,7 @@ type templateData struct {
 	Timestamp    string
 	Environments map[string]string
 	Services     []string
+	Commits      map[versionKey]string
 	Versions     map[versionKey]string
 }
 
@@ -55,6 +57,10 @@ var services = []string{
 	"surveysvc"}
 
 // See https://stackoverflow.com/a/45612142
+func (t templateData) Commit(environment, service string) string {
+	return t.Commits[versionKey{environment, service}]
+}
+
 func (t templateData) Version(environment, service string) string {
 	return t.Versions[versionKey{environment, service}]
 }
@@ -80,22 +86,46 @@ func main() {
 
 func buildTemplateData() templateData {
 	timestamp := time.Now().Format(timeFormat)
+	commits := make(map[versionKey]string)
 	versions := make(map[versionKey]string)
 
 	for _, environment := range environments {
 		for _, service := range services {
 			versionKey := versionKey{environment, service}
+			commits[versionKey] = commitForEnvironment(environment, service)
 			versions[versionKey] = versionForEnvironment(environment, service)
 			fmt.Print(".")
 		}
 	}
 
-	return templateData{timestamp, environments, services, versions}
+	return templateData{timestamp, environments, services, commits, versions}
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl := template.Must(template.ParseFiles("index.html"))
 	tmpl.Execute(w, buildTemplateData())
+}
+
+func commitForEnvironment(environment, service string) string {
+	commit := ""
+	doc, err := goquery.NewDocument(fmt.Sprintf("%s/%s/services/%s.version", baseURL, environment, service))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	doc.Find("body").Each(func(i int, s *goquery.Selection) {
+		if s.Text() != "" && !strings.Contains(s.Text(), "404: Not Found") {
+			commit = s.Text()
+		}
+	})
+
+	versionAndCommit := strings.Split(commit, delimiter)
+
+	if len(versionAndCommit) > 1 {
+		commit = versionAndCommit[1]
+	}
+
+	return commit
 }
 
 func versionForEnvironment(environment, service string) string {
@@ -108,6 +138,12 @@ func versionForEnvironment(environment, service string) string {
 	doc.Find("body").Each(func(i int, s *goquery.Selection) {
 		if s.Text() != "" && !strings.Contains(s.Text(), "404: Not Found") {
 			version = s.Text()
+		}
+
+		versionAndCommit := strings.Split(version, delimiter)
+
+		if len(versionAndCommit) > 1 {
+			version = versionAndCommit[0]
 		}
 	})
 
