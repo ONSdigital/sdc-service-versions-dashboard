@@ -72,7 +72,10 @@
           <td>{{$service}}</td>
         {{range $label, $environment := $environments}}
           {{$version := $.Version $environment $service}}
-          <td data-content="{{$version}}">{{$version}}</td>
+          <td data-content="{{$version.Version}}">
+            {{$version.Version}}<br>
+            <span>{{$version.Commit}}</span>
+          </td>
         {{end}}
         </tr>
       {{end}}

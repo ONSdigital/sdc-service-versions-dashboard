@@ -16,7 +16,13 @@ import (
 )
 
 const baseURL = "https://raw.githubusercontent.com/ONSdigital/sdc-service-versions"
+const delimiter = ","
 const timeFormat = "Monday, 2 January 2006 15:04 MST"
+
+type version struct {
+	Version string
+	Commit  string
+}
 
 type versionKey struct {
 	Environment string
@@ -29,14 +35,14 @@ type templateData struct {
 	Services     []string
 	Versions     struct {
 		sync.RWMutex
-		m map[versionKey]string
+		m map[versionKey]version
 	}
 }
 
 var versions = struct {
 	sync.RWMutex
-	m map[versionKey]string
-}{m: make(map[versionKey]string)}
+	m map[versionKey]version
+}{m: make(map[versionKey]version)}
 
 var environments = map[string]string{
 	"CAT":            "cat",
@@ -64,7 +70,7 @@ var services = []string{
 	"surveysvc"}
 
 // See https://stackoverflow.com/a/45612142
-func (t templateData) Version(environment, service string) string {
+func (t templateData) Version(environment, service string) version {
 	t.Versions.RLock()
 	defer t.Versions.RUnlock()
 	return t.Versions.m[versionKey{environment, service}]
@@ -108,18 +114,29 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.Execute(w, buildTemplateData())
 }
 
+func getBodyContent(doc *goquery.Document) string {
+	var bodyContent string
+	doc.Find("body").Each(func(i int, s *goquery.Selection) {
+		if s.Text() != "" && !strings.Contains(s.Text(), "404: Not Found") {
+			bodyContent = s.Text()
+		}
+	})
+
+	return bodyContent
+}
+
 func versionForEnvironment(environment, service string) {
-	version := "N/A"
+	version := version{Version: "N/A"}
 	doc, err := goquery.NewDocument(fmt.Sprintf("%s/%s/services/%s.version", baseURL, environment, service))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	doc.Find("body").Each(func(i int, s *goquery.Selection) {
-		if s.Text() != "" && !strings.Contains(s.Text(), "404: Not Found") {
-			version = s.Text()
-		}
-	})
+	bodyContent := strings.Split(getBodyContent(doc), delimiter)
+	if len(bodyContent) > 1 {
+		version.Version = bodyContent[0]
+		version.Commit = bodyContent[1]
+	}
 
 	versions.Lock()
 	versions.m[versionKey{environment, service}] = version
