@@ -18,6 +18,11 @@ const baseURL = "https://raw.githubusercontent.com/ONSdigital/sdc-service-versio
 const delimiter = ","
 const timeFormat = "Monday, 2 January 2006 15:04 MST"
 
+type version struct {
+	Version string
+	Commit  string
+}
+
 type versionKey struct {
 	Environment string
 	Service     string
@@ -27,8 +32,7 @@ type templateData struct {
 	Timestamp    string
 	Environments map[string]string
 	Services     []string
-	Commits      map[versionKey]string
-	Versions     map[versionKey]string
+	Versions     map[versionKey]version
 }
 
 var environments = map[string]string{
@@ -57,11 +61,7 @@ var services = []string{
 	"surveysvc"}
 
 // See https://stackoverflow.com/a/45612142
-func (t templateData) Commit(environment, service string) string {
-	return t.Commits[versionKey{environment, service}]
-}
-
-func (t templateData) Version(environment, service string) string {
+func (t templateData) Version(environment, service string) version {
 	return t.Versions[versionKey{environment, service}]
 }
 
@@ -86,19 +86,17 @@ func main() {
 
 func buildTemplateData() templateData {
 	timestamp := time.Now().Format(timeFormat)
-	commits := make(map[versionKey]string)
-	versions := make(map[versionKey]string)
+	versions := make(map[versionKey]version)
 
 	for _, environment := range environments {
 		for _, service := range services {
 			versionKey := versionKey{environment, service}
-			commits[versionKey] = commitForEnvironment(environment, service)
 			versions[versionKey] = versionForEnvironment(environment, service)
 			fmt.Print(".")
 		}
 	}
 
-	return templateData{timestamp, environments, services, commits, versions}
+	return templateData{timestamp, environments, services, versions}
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -117,31 +115,17 @@ func getBodyContent(doc *goquery.Document) string {
 	return bodyContent
 }
 
-func commitForEnvironment(environment, service string) string {
-	commit := ""
+func versionForEnvironment(environment, service string) version {
+	version := version{Version: "N/A"}
 	doc, err := goquery.NewDocument(fmt.Sprintf("%s/%s/services/%s.version", baseURL, environment, service))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	versionAndCommit := strings.Split(getBodyContent(doc), delimiter)
-	if len(versionAndCommit) > 1 {
-		commit = versionAndCommit[1]
-	}
-
-	return commit
-}
-
-func versionForEnvironment(environment, service string) string {
-	version := "N/A"
-	doc, err := goquery.NewDocument(fmt.Sprintf("%s/%s/services/%s.version", baseURL, environment, service))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	versionAndCommit := strings.Split(getBodyContent(doc), delimiter)
-	if len(versionAndCommit) > 1 {
-		version = versionAndCommit[0]
+	bodyContent := strings.Split(getBodyContent(doc), delimiter)
+	if len(bodyContent) > 1 {
+		version.Version = bodyContent[0]
+		version.Commit = bodyContent[1]
 	}
 
 	return version
